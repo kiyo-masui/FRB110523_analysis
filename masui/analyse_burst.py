@@ -115,6 +115,17 @@ else:
     DM_OFF = 94
 
 
+print matplotlib.rcParams['font.sans-serif']
+
+matplotlib.rcParams.update({
+    'pdf.fonttype': 42,
+    'ps.fonttype': 42,
+    'font.serif' : ['Times New Roman'],
+    'font.sans-serif' : ['Helvetica', 'Arial'],
+    })
+print matplotlib.rcParams['font.sans-serif']
+
+
 def main():
     """Each function below is independent, in that any of them can be run with
     the others commented out using saved data. However, the preprocessing must
@@ -123,31 +134,31 @@ def main():
     """
 
     #Preprocessing
-    reformat_raw_data()
-    calibrator_spectra()
-    calibrate()
-    filter()
+    #reformat_raw_data()
+    #calibrator_spectra()
+    #calibrate()
+    #filter()
 
-    plot()
+    #plot()
 
     # Fitting.
-    fit_basic()
+    #fit_basic()
     #fit_beam()    # Fit does not converge.
 
     # Spectral plots.
     plot_spectra()
 
     # Scintillation.
-    fit_scintil()
+    #fit_scintil()
 
     # Faraday rotation measurement.
-    rm_measure()
+    #rm_measure()
 
     # Pulse profile plots.
     pol_profile()
 
     # Ephemeris.
-    arrival_coords()
+    #arrival_coords()
 
 
 

@@ -27,7 +27,6 @@ end
 
 myopts.nstep=500000;
 myopts.outroot='chains/chain_qu_ramp_conv_real_newdat_good.txt';
-%myopts.outroot='chains/chain_qu_ramp_conv_real_newdat_good_redo.txt';
 myopts.func=@get_burst_real_chisq_qu_ramp_conv_cached_c;
 myopts.noise_scale=1.025;
 

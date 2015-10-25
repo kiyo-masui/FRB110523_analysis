@@ -25,17 +25,9 @@ if ~exist('dat')
    
 end
 
-%dataptr=float2ptr(dat);
-%model=float2ptr(dat);
-%nvec=double(std(dat));nvec=1./nvec.^2;
-%mm=make_burst_model_real_c(dt,length(dat),freq_use,best_guess(1),best_guess(2),best_guess(3),best_guess(5),best_guess(6));
-
-
 myopts.nstep=500000;
 myopts.outroot='chains/chain_tt_real_scatpow_newdat.txt';
 myopts.func=@get_chisq_real_scatpow;
 myopts.noise_scale=1.025;
 
 [pp,ll,nvec]=mcmc_burst_real(dat,myopts,freq_use,best_guess,0.5*mycov,dt);
-
-mpi_barrier;

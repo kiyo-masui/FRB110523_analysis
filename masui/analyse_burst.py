@@ -131,7 +131,7 @@ def main():
     """
 
     #Preprocessing
-    #reformat_raw_data()
+    reformat_raw_data()
     #calibrator_spectra()
     #calibrate()
     #filter()
@@ -143,7 +143,7 @@ def main():
     #fit_beam()    # Fit does not converge.
 
     # Spectral plots.
-    plot_spectra()
+    #plot_spectra()
 
     # Scintillation.
     #fit_scintil()
@@ -152,7 +152,7 @@ def main():
     #rm_measure()
 
     # Pulse profile plots.
-    pol_profile()
+    #pol_profile()
 
     # Ephemeris.
     #arrival_coords()
@@ -164,27 +164,12 @@ def main():
 
 def reformat_raw_data():
     hdulist = pyfits.open(path.join(DATAROOT, FILENAME), 'readonly')
-    # Parameters.
-    mheader = hdulist[0].header
-    dheader = hdulist[1].header
-    delta_t = dheader['TBIN']
-    nfreq = dheader['NCHAN']
-    delta_f = dheader['CHAN_BW']
-    freq0 = mheader['OBSFREQ'] - mheader['OBSBW'] / 2. + delta_f / 2
-    time0 = mheader["STT_SMJD"] + mheader["STT_OFFS"]
-
-    #freq = np.arange(nfreq) * delta_f + freq0  # MHz
-    freq = hdulist[1].data[0]['DAT_FREQ'].astype(float)
-
-    # Now read the main data.
-    data = read_fits_data(hdulist)
-    
-    time = np.arange(data.shape[2]) * delta_t + time0
-    subint_time = time0 + hdulist[1].data['OFFS_SUB']
-    ra = sample_subint(subint_time, hdulist[1].data['RA_SUB'], time)
-    dec = sample_subint(subint_time, hdulist[1].data['DEC_SUB'], time)
-    az = sample_subint(subint_time, hdulist[1].data['TEL_AZ'], time)
-    el = 90. - sample_subint(subint_time, hdulist[1].data['TEL_ZEN'], time)
+    if BURST:
+        data, time, freq, ra, dec, az, el = read_fits_data(hdulist)
+    else:
+        # These pulsar files are too long to read all of them.
+        data, time, freq, ra, dec, az, el = read_fits_data(hdulist, 0, 25)
+    hdulist.close()
 
     # Masking.
     mask_chans = np.any(np.isnan(data[:,:,0]), 1)
@@ -202,29 +187,41 @@ def reformat_raw_data():
 
 
 def sample_subint(sub_time, sub_var, time):
-
-    diff = np.diff(sub_var) / np.diff(sub_time)
-    if BURST:
-        if not np.allclose(diff, diff[0], rtol=2.):
-            raise ValueError('Not linear')
-    rate = np.mean(diff)
-    start_ind = np.argmin(np.abs(time - sub_time[0]))
-    return (time - time[start_ind]) * rate + sub_var[0]
+    # This interpolator will also extrapolate.
+    interpolator = interpolate.InterpolatedUnivariateSpline(sub_time, sub_var,
+            k=1)
+    return interpolator(time)
 
 
-def read_fits_data(hdulist):
-    start_record = 0
-    if BURST:
-        end_record = None
-    else:
-        # These scans are long and I don't have disk space for all of it.
-        end_record = 25
+def read_fits_data(hdulist, start_record=None, end_record=None):
+    if start_record is None:
+        start_record = 0
+
+    # Parameters.
+    mheader = hdulist[0].header
+    dheader = hdulist[1].header
+    delta_t = dheader['TBIN']
+    nfreq = dheader['NCHAN']
+    delta_f = dheader['CHAN_BW']
+    freq0 = mheader['OBSFREQ'] - mheader['OBSBW'] / 2. + delta_f / 2
+    time0 = mheader["STT_SMJD"] + mheader["STT_OFFS"]
+
+    #freq = np.arange(nfreq) * delta_f + freq0  # MHz
+    freq = hdulist[1].data[0]['DAT_FREQ'].astype(float)
 
     nrecords = len(hdulist[1].data)
     if end_record is None or end_record > nrecords:
         end_record = nrecords
     nrecords_read = end_record - start_record
     ntime_record, npol, nfreq, one = hdulist[1].data[0]["DATA"].shape
+
+    time = (np.arange(nrecords_read * ntime_record) * delta_t
+            + time0 + start_record * delta_t * ntime_record)
+    subint_time = time0 + hdulist[1].data['OFFS_SUB']
+    ra = sample_subint(subint_time, hdulist[1].data['RA_SUB'], time)
+    dec = sample_subint(subint_time, hdulist[1].data['DEC_SUB'], time)
+    az = sample_subint(subint_time, hdulist[1].data['TEL_AZ'], time)
+    el = 90. - sample_subint(subint_time, hdulist[1].data['TEL_ZEN'], time)
 
     out_data = np.empty((nfreq, npol, nrecords_read, ntime_record), dtype=np.float32)
     for ii in xrange(nrecords_read):
@@ -247,7 +244,7 @@ def read_fits_data(hdulist):
         out_data[:,3,ii,:] = np.transpose(record[:,3,:,0])
     out_data.shape = (nfreq, npol, nrecords_read * ntime_record)
 
-    return out_data
+    return out_data, time, freq, ra, dec, az, el
 
 
 # Calibration
@@ -258,7 +255,7 @@ def calibrator_spectra():
     src_means = []
     for ii, filename in enumerate(SRCFILES):
         srchdulist = pyfits.open(path.join(DATAROOT, filename), 'readonly')
-        src_data = read_fits_data(srchdulist)
+        src_data, time, freq, ra, dec, az, el = read_fits_data(srchdulist)
         preprocess_data(src_data, srchdulist, SRC_CAL_PHASES[ii])
         src_means.append(np.mean(src_data, -1))
         del src_data

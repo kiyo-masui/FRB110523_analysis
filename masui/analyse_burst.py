@@ -115,15 +115,12 @@ else:
     DM_OFF = 94
 
 
-print matplotlib.rcParams['font.sans-serif']
-
 matplotlib.rcParams.update({
     'pdf.fonttype': 42,
     'ps.fonttype': 42,
     'font.serif' : ['Times New Roman'],
     'font.sans-serif' : ['Helvetica', 'Arial'],
     })
-print matplotlib.rcParams['font.sans-serif']
 
 
 def main():

@@ -131,7 +131,7 @@ def main():
     """
 
     #Preprocessing
-    reformat_raw_data()
+    #reformat_raw_data()
     #calibrator_spectra()
     #calibrate()
     #filter()
@@ -139,7 +139,7 @@ def main():
     #plot()
 
     # Fitting.
-    #fit_basic()
+    fit_basic()
     #fit_beam()    # Fit does not converge.
 
     # Spectral plots.
@@ -552,6 +552,18 @@ def fit_basic():
     nfitdata = ntime * np.sum(np.logical_not(mask_chans))
     npars = len(pars0)
 
+    # Plot the profile and initial model.
+    pars0_real = unwrap_basic_pars(pars0)
+    plot_pulse(data_I, freq, time, pars0_real[0], pars0_real[1])
+    initial_model = -residuals_basic(
+                np.zeros_like(data_I),
+                freq,
+                time,
+                pars0_real,
+                )
+    plot_pulse(initial_model, freq, time, pars0_real[0], pars0_real[1])
+    plt.show()
+
     residuals = lambda p: (
             residuals_basic(
                 data_I,
@@ -584,6 +596,26 @@ def fit_basic():
     corr = cov / errs / errs[:,None]
     print "Errors:\n", errs
     print "Correlations:\n", corr
+
+
+
+def plot_pulse(data_I, freq, time, t0, dm, time_range=0.4):
+
+    time_selector = RangeSelector(time)
+    delay = delay_from_dm(freq, dm, t0)
+
+    time_selector = RangeSelector(time)
+
+    profile = 0
+    for ii in range(len(freq)):
+        start_ind, stop_ind = time_selector(delay[ii] - time_range/2,
+                                            delay[ii] + time_range/2)
+        profile += data_I[ii, start_ind:stop_ind]
+    profile /= len(freq)
+
+    start_ind, stop_ind = time_selector(delay[0] - time_range/2,
+                                        delay[0] + time_range/2)
+    plt.plot(time[start_ind:stop_ind], profile)
 
 
 
@@ -1738,10 +1770,10 @@ class RangeSelector(object):
         self._s0 = time[0]
 
     def __call__(self, start, stop):
+        n = int(math.ceil((stop - start) / self._delta))
         start_ind = (start - self._s0) / self._delta
-        start_ind = int(math.ceil(start_ind))
-        stop_ind = (stop - self._s0) / self._delta
-        stop_ind = int(math.ceil(stop_ind))
+        start_ind = int(round(start_ind))
+        stop_ind = start_ind + n
         return start_ind, stop_ind
 
 

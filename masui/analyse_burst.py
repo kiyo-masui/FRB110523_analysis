@@ -604,9 +604,7 @@ def plot_pulse(data_I, freq, time, t0, dm, time_range=0.4):
     time_selector = RangeSelector(time)
     delay = delay_from_dm(freq, dm, t0)
 
-    time_selector = RangeSelector(time)
-
-    profile = 0
+    profile = 0.
     for ii in range(len(freq)):
         start_ind, stop_ind = time_selector(delay[ii] - time_range/2,
                                             delay[ii] + time_range/2)

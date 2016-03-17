@@ -48,7 +48,7 @@ if BURST:
     SRC_CAL_PHASES = [40, 42, 28, 47]
 
     # The small time slice of data containing the burst.
-    TSL = np.s_[23000:26500]
+    TSL = np.s_[31000:37000]
 
 else:
     # For analysis of pulsar single pulses.
@@ -88,10 +88,9 @@ BEAM_DATA_FWHM = [0.307, 0.245]
 BEAM_DATA_FREQ = [699.9, 900.1]
 
 
-# These are the fit parameters that come out of fit_basic(), which agree with
-# Jonathan Sievers' MCMC fits to the expected level (1 sigma).
-FIT_PARS = [54290.138578290294, 623.35540269174237, 0.0039736854175394781, 
-            7.8287795616885543, 0.00071318994294502418, 0.00160942937546788]
+# These are the fit parameters that come out of fit_basic().
+FIT_PARS = [12348.026880029967, 1615.1956156613062, 0.00074377848095375973,
+        -13.3941678609809, 0.0012207717268768127, 0.0058556473454061449]
 
 B2319_PARS = [52187.604450591927, 94.783490187710271, 0.17607219167484128,
         2.0978781725590876, 0.010991132078497551, -0.0010897690798342145]
@@ -106,8 +105,8 @@ ALPHA_POL = 6.64
 
 if BURST:
     # Shift some parameters for well behaved fitting.
-    T_OFF = 54290.1
-    DM_OFF = 620
+    T_OFF = 12348.
+    DM_OFF = 1610.
 else:
     # Pulsar dependant:
     # B2319
@@ -139,11 +138,11 @@ def main():
     #plot()
 
     # Fitting.
-    fit_basic()
+    #fit_basic()
     #fit_beam()    # Fit does not converge.
 
     # Spectral plots.
-    #plot_spectra()
+    plot_spectra()
 
     # Scintillation.
     #fit_scintil()
@@ -165,7 +164,7 @@ def main():
 def reformat_raw_data():
     hdulist = pyfits.open(path.join(DATAROOT, FILENAME), 'readonly')
     if BURST:
-        data, time, freq, ra, dec, az, el = read_fits_data(hdulist)
+        data, time, freq, ra, dec, az, el = read_fits_data(hdulist, 20, 50)
     else:
         # These pulsar files are too long to read all of them.
         data, time, freq, ra, dec, az, el = read_fits_data(hdulist, 0, 25)
@@ -418,6 +417,7 @@ def filter():
         std[ii] = np.sqrt(np.mean(this_data**2, -1))
         third_moment = np.mean(this_data**3, -1)
         skew[ii] = third_moment
+        # TODO forth?
 
     norm = mean.copy()
     norm[:,[1,2]] = np.sqrt(norm[:,0] * norm[:,3])[:,None]
@@ -535,7 +535,7 @@ def fit_basic():
     var = np.empty(data.shape[:-1], dtype=float)
     for ii in range(len(freq)):
         # Exclude the beginning and end which is invalid due to filtering.
-        var[ii] = np.var(data[ii,:,5000:-5000], -1)
+        var[ii] = np.var(data[ii,:,TSL], -1)
 
     data_I = data[:,0,TSL]
     time = time[TSL]
@@ -543,7 +543,7 @@ def fit_basic():
     # Real scan angle.  Constant elevation scan.
     scan_loc = (az - az[0]) * np.cos(el[0] * np.pi / 180)
 
-    pars0 = [0.038, 3., 0.004, 7., 0.001, 0.001]
+    pars0 = [0.03, 3., 0.001, -10., 0.002, 0.002]
 
     std_I = np.sqrt(var[:,0])
     weights = np.empty_like(std_I)
@@ -554,14 +554,16 @@ def fit_basic():
 
     # Plot the profile and initial model.
     pars0_real = unwrap_basic_pars(pars0)
-    plot_pulse(data_I, freq, time, pars0_real[0], pars0_real[1])
+    plot_pulse(data_I, freq, time, pars0_real[0], pars0_real[1], pars0_real[3],
+            time_range=0.4)
     initial_model = -residuals_basic(
                 np.zeros_like(data_I),
                 freq,
                 time,
                 pars0_real,
                 )
-    plot_pulse(initial_model, freq, time, pars0_real[0], pars0_real[1])
+    plot_pulse(initial_model, freq, time, pars0_real[0], pars0_real[1],
+            pars0_real[3])
     plt.show()
 
     residuals = lambda p: (
@@ -599,21 +601,28 @@ def fit_basic():
 
 
 
-def plot_pulse(data_I, freq, time, t0, dm, time_range=0.4):
+def plot_pulse(data_I, freq, time, t0, dm, alpha=0, time_range=0.4):
 
     time_selector = RangeSelector(time)
     delay = delay_from_dm(freq, dm, t0)
+
+    spec_weights = (freq / 800.)**-alpha
 
     profile = 0.
     for ii in range(len(freq)):
         start_ind, stop_ind = time_selector(delay[ii] - time_range/2,
                                             delay[ii] + time_range/2)
-        profile += data_I[ii, start_ind:stop_ind]
+        profile += data_I[ii, start_ind:stop_ind] * spec_weights[ii]
     profile /= len(freq)
 
     start_ind, stop_ind = time_selector(delay[0] - time_range/2,
                                         delay[0] + time_range/2)
+
+    t = time[start_ind:stop_ind]
     plt.plot(time[start_ind:stop_ind], profile)
+
+    return t, profile
+
 
 
 

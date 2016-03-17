@@ -148,6 +148,7 @@ def main():
     #fit_scintil()
 
     # Faraday rotation measurement.
+    rm_synth()
     #rm_measure()
 
     # Pulse profile plots.
@@ -842,6 +843,36 @@ def plot_spectra():
             ha='center', va='center', rotation='vertical')
 
     plt.show()
+
+def rm_synth():
+    data, mask_chans, time, freq, ra, dec, az, el = import_all('filtered_short')
+
+    spec = integrated_pulse_spectrum(data, freq, time, FIT_PARS,
+            True)
+
+    pol_spec_comp = spec[:,1] + 1j * spec[:,2]
+
+    # Noise estimate.
+    noise = 0
+    n_real = 33
+    p = list(FIT_PARS)
+    p[0] = p[0] - 0.5
+    for ii in range(n_real):
+        p[0] = p[0] + 0.03
+        noise += integrated_pulse_spectrum(data, freq, time, p,
+                matched=matched)**2
+    noise /= n_real
+    noise = np.sqrt(noise)
+    noise[mask_chans] = 1000.
+
+    plt.plot(freq, np.sqrt(noise[:,0]))
+    plt.plot(freq, spec[:,0])
+    plt.show()
+
+
+    RM_range = np.arange(-2000, 2000, dtype=float)
+
+
 
 
 def integrated_pulse_spectrum(data, freq, time, pars, matched=True):

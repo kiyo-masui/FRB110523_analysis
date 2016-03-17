@@ -148,11 +148,11 @@ def main():
     #fit_scintil()
 
     # Faraday rotation measurement.
-    rm_synth()
+    #rm_synth()
     #rm_measure()
 
     # Pulse profile plots.
-    #pol_profile()
+    pol_profile()
 
     # Ephemeris.
     #arrival_coords()
@@ -844,34 +844,68 @@ def plot_spectra():
 
     plt.show()
 
+
 def rm_synth():
     data, mask_chans, time, freq, ra, dec, az, el = import_all('filtered_short')
 
     spec = integrated_pulse_spectrum(data, freq, time, FIT_PARS,
             True)
 
-    pol_spec_comp = spec[:,1] + 1j * spec[:,2]
-
     # Noise estimate.
     noise = 0
-    n_real = 33
+    n_real = 36
+    noise_real = np.empty((n_real,) + spec.shape, dtype=float)
     p = list(FIT_PARS)
-    p[0] = p[0] - 0.5
+    p[0] = p[0] - 0.4
     for ii in range(n_real):
-        p[0] = p[0] + 0.03
-        noise += integrated_pulse_spectrum(data, freq, time, p,
-                matched=matched)**2
-    noise /= n_real
+        p[0] = p[0] + 0.02
+        noise_real[ii] += integrated_pulse_spectrum(data, freq, time, p,
+                matched=True)
+    noise = np.mean(noise_real**2, 0)
     noise = np.sqrt(noise)
-    noise[mask_chans] = 1000.
+    noise[mask_chans,:] = 1000.
 
-    plt.plot(freq, np.sqrt(noise[:,0]))
+    plt.figure()
+    plt.imshow(noise_real[:,:,0], aspect='auto')
+
+    plt.figure()
     plt.plot(freq, spec[:,0])
+    plt.plot(freq, noise[:,0])
+    plt.ylim((0, 0.05))
+
+    pol_spec_comp = spec[:,1] + 1j * spec[:,2]
+    pol_spec_comp_noise = pol_spec_comp / (noise[:,1]**2 + noise[:,2]**2)
+
+    plt.figure()
+    plt.plot(freq, spec[:,1])
+    plt.plot(freq, spec[:,2])
+    plt.plot(freq, np.sqrt(noise[:,1]**2 + noise[:,2]**2))
+    plt.ylim((0, 0.05))
+
+    f_ref = 860.   # S/N pivot is high for this data.
+    alpha = FIT_PARS[3]
+
+    RM = np.arange(-4000, 4000, dtype=float)
+
+    RM_spec = np.empty(RM.shape, dtype=complex)
+    for ii, this_RM in enumerate(RM):
+        pol_angle = 2 * this_RM * ((3e8 / freq / 1e6)**2 - (3e8 / f_ref / 1e6)**2)
+        pol_spec_derotated = pol_spec_comp_noise * np.exp(-1j * pol_angle)
+        pol_spec_derotated *= (freq / f_ref)**-alpha
+        RM_spec[ii] = np.mean(pol_spec_derotated)
+
+    intensity_norm = np.mean(spec[:,0] / (noise[:,1]**2 + noise[:,2]**2)
+                             * (freq / f_ref)**-alpha)
+    RM_spec /= intensity_norm    # Units of polarization fraction.
+
+    plt.figure()
+    plt.plot(RM, abs(RM_spec))
+
+    plt.figure()
+    plt.plot(RM, RM_spec.real)
+    plt.plot(RM, RM_spec.imag)
+
     plt.show()
-
-
-    RM_range = np.arange(-2000, 2000, dtype=float)
-
 
 
 
@@ -1514,7 +1548,7 @@ def pol_profile():
             nbins, t0, dm, RM, phi, f_ref, alpha)
 
     noise_profiles = get_pol_profile(data, mask_chans, time, freq,
-            400, t0 + 0.5, dm, RM, phi, f_ref, alpha)
+            400, t0 + 0.02, dm, RM, phi, f_ref, alpha)
     noise = np.std(noise_profiles, 1)
 
 
